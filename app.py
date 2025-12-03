@@ -38,7 +38,7 @@ except AttributeError:
 # CONFIG DB / MAIL
 
 DB_USER = os.getenv("DB_USER", "root")                      #Demonstração GITHUB
-DB_PASSWORD = os.getenv("DB_PASSWORD", "EXEMPLO")           #Demonstração GITHUB
+DB_PASSWORD = os.getenv("DB_PASSWORD")                      #Demonstração GITHUB
 DB_HOST = os.getenv("DB_HOST", "000.0.0.0")                 #Demonstração GITHUB
 DB_PORT = os.getenv("DB_PORT", "3306")                      #Demonstração GITHUB
 DB_NAME = os.getenv("DB_NAME", "controle_ligacoes")         #Demonstração GITHUB
