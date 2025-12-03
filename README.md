@@ -85,9 +85,6 @@ Acesse:
 
 # 📸 Preview do Sistema
 
-> Adicione seus prints dentro da pasta: `docs/screenshots/`  
-> e ajuste os nomes conforme necessário.
-
 ### 🔐 Login
 ![Login](docs/screenshots/login.png)
 
