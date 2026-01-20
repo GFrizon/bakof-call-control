@@ -1,0 +1,931 @@
+{% extends "layout.html" %}
+{% block title %}Meus Clientes{% endblock %}
+{% block content %}
+
+<!-- 🆕 POP-UP DE NOVIDADES -->
+{% if mostrar_novidades %}
+<div class="modal fade show" id="modalNovidades" tabindex="-1" style="display: block; background: rgba(0,0,0,0.5);">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-stars"></i> 🎉 Novidades da Atualização!
+        </h5>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info mb-3">
+          <i class="bi bi-info-circle"></i> <strong>Versão 2.0</strong> - Confira as novidades!
+        </div>
+        
+        <ul class="list-unstyled">
+          <li class="mb-3">
+            <i class="bi bi-pencil-square text-success fs-5"></i>
+            <strong>Editar observações</strong><br>
+            <small class="text-muted">Agora você pode editar as observações das ligações já registradas! Clique no ícone de lápis no histórico.</small>
+          </li>
+          
+          <li class="mb-3">
+            <i class="bi bi-calendar-range text-primary fs-5"></i>
+            <strong>Filtro por mês (Supervisor)</strong><br>
+            <small class="text-muted">Supervisores podem visualizar o desempenho dos consultores mês a mês.</small>
+          </li>
+          
+          <li class="mb-3">
+            <i class="bi bi-bell text-warning fs-5"></i>
+            <strong>Sistema de notificações</strong><br>
+            <small class="text-muted">Fique por dentro das atualizações do sistema!</small>
+          </li>
+        </ul>
+        
+        <div class="alert alert-success mb-0">
+          <i class="bi bi-check-circle"></i> Todas as funcionalidades anteriores continuam funcionando normalmente!
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" onclick="fecharNovidades()">
+          <i class="bi bi-check-lg"></i> Entendi!
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between mb-4 gap-3">
+  <div>
+    <h2 class="m-0 fw-bold text-dark">
+      <i class="bi bi-people-fill text-primary"></i> Meus Clientes
+    </h2>
+    <p class="text-muted mb-0 mt-1">Gerencie e registre ligações facilmente</p>
+  </div>
+  <div class="d-flex gap-2">
+
+    <!-- NOVO: Adicionar cliente manual -->
+    <button class="btn btn-primary" onclick="abrirModalAdicionar()">
+      <i class="bi bi-person-plus"></i> Adicionar Cliente
+    </button>
+
+    {% if is_supervisor %}
+    <button class="btn btn-warning" onclick="abrirModalLimpar()">
+      <i class="bi bi-trash"></i> Limpar Clientes
+    </button>
+    <a href="{{ url_for('importar_clientes_view') }}" class="btn btn-success">
+      <i class="bi bi-cloud-upload"></i> Importar CSV
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if current_user.tipo == 'consultor' and stats %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+          <span class="text-muted">Clientes ativos</span>
+          <i class="bi bi-person-check"></i>
+        </div>
+        <div class="stat-value">{{ stats.total_clientes }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+          <span class="text-muted">Hoje</span>
+          <i class="bi bi-telephone-outbound"></i>
+        </div>
+        <div class="stat-value">{{ stats.ligacoes_hoje }}</div>
+        <div class="progress" style="height: 6px;"><div class="progress-bar" style="width: {{ stats.progresso_meta }}%"></div></div>
+        <small class="text-muted">Meta {{ stats.meta_diaria }} ({{ stats.progresso_meta }}%)</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+          <span class="text-muted">Últimos 7 dias</span>
+          <i class="bi bi-calendar-week"></i>
+        </div>
+        <div class="stat-value">{{ stats.ligacoes_semana }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+          <span class="text-muted">Últimos 30 dias</span>
+          <i class="bi bi-calendar3"></i>
+        </div>
+        <div class="stat-value">{{ stats.ligacoes_mes }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- 🆕 FILTRO MENSAL PARA CONSULTORES -->
+{% if current_user.tipo == 'consultor' and meses_disponiveis_consultor %}
+<div class="card mb-4 border-primary">
+  <div class="card-header bg-primary text-white">
+    <i class="bi bi-calendar-range"></i> <strong>Filtro de Ligações por Mês</strong>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-8">
+        <label for="filtroMesConsultor" class="form-label">Selecione o mês para visualizar suas ligações:</label>
+        <select class="form-select" id="filtroMesConsultor" onchange="aplicarFiltroMesConsultor()">
+          <option value="">Todos (sem filtro)</option>
+          {% for m in meses_disponiveis_consultor %}
+          <option value="{{ m.mes }}-{{ m.ano }}" {% if mes_filtro == m.mes and ano_filtro == m.ano %}selected{% endif %}>
+            {{ m.texto }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <button class="btn btn-primary w-100" onclick="aplicarFiltroMesConsultor()">
+          <i class="bi bi-search"></i> Filtrar
+        </button>
+        {% if mes_filtro and ano_filtro %}
+        <button class="btn btn-outline-secondary w-100 mt-2" onclick="limparFiltroMesConsultor()">
+          <i class="bi bi-x-circle"></i> Limpar Filtro
+        </button>
+        {% endif %}
+      </div>
+    </div>
+    
+    <!-- 🆕 RESULTADOS DO MÊS SELECIONADO -->
+    {% if mes_filtro and ano_filtro %}
+    <div id="resultadosMesSelecionado" class="mt-3" style="display: none;">
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Carregando dados do mês selecionado...
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- BUSCA + FILTROS -->
+<form method="get" action="{{ url_for('meus_clientes') }}" class="row g-3">
+  <input type="hidden" name="aba" value="{{ aba }}">
+  <div class="col-md-6">
+    <div class="input-group">
+      <span class="input-group-text"><i class="bi bi-search"></i></span>
+      <input type="text" class="form-control" name="q"
+             placeholder="Buscar por nome, CNPJ, telefone ou representante..."
+             value="{{ request.args.get('q','') }}">
+    </div>
+  </div>
+
+  {% if aba == 'contatados' %}
+  <div class="col-md-3">
+    <select class="form-select" name="filtro" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      <option value="antigos" {% if request.args.get('filtro') == 'antigos' %}selected{% endif %}>+30 dias sem contato</option>
+      <option value="recentes" {% if request.args.get('filtro') == 'recentes' %}selected{% endif %}>Contatos recentes (≤7 dias)</option>
+    </select>
+  </div>
+  {% endif %}
+
+  <!-- NOVO: Filtro por origem -->
+  <div class="col-md-3">
+    <select id="filtroOrigem" class="form-select" onchange="filtrarPorOrigem()">
+      <option value="">Origem: todas</option>
+      <option value="manual">Origem: manual</option>
+      <option value="importado_csv">Origem: importado</option>
+    </select>
+  </div>
+
+  <div class="col-12 text-end">
+    <button type="submit" class="btn btn-outline-primary">
+      <i class="bi bi-funnel"></i> Aplicar filtros
+    </button>
+  </div>
+</form>
+
+<!-- TABELA -->
+<div class="card mt-3">
+  <div class="card-body">
+    <ul class="nav nav-tabs">
+      <li class="nav-item"><a class="nav-link {{ 'active' if aba == 'pendentes' }}" href="{{ url_for('meus_clientes', aba='pendentes') }}">Pendentes ({{ total_pendentes }})</a></li>
+      <li class="nav-item"><a class="nav-link {{ 'active' if aba == 'contatados' }}" href="{{ url_for('meus_clientes', aba='contatados') }}">Contatados ({{ total_contatados }})</a></li>
+      <li class="nav-item"><a class="nav-link {{ 'active' if aba == 'retornar' }}" href="{{ url_for('meus_clientes', aba='retornar') }}">Retornar ({{ total_retornar }})</a></li>
+    </ul>
+
+    <div class="table-responsive mt-3">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>CNPJ</th>
+            <th>Telefone</th>
+            <th>Representante</th>
+            {% if aba != 'pendentes' %}
+            <th>Última Ligação</th>
+            {% endif %}
+            {% if aba == 'retornar' %}
+            <th>Próxima Ligação</th>
+            {% endif %}
+            <th>Total Ligações</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyClientes">
+
+        {% if clientes %}
+        {% for c in clientes %}
+        <tr data-origem="{{ c.origem or '' }}">
+          <td>
+            <div class="d-flex flex-column">
+              <strong>{{ c.nome }}</strong>
+              <div class="mt-1">
+                {% if c.origem == 'manual' %}
+                  <span class="badge bg-secondary">Manual</span>
+                {% elif c.origem == 'importado_csv' %}
+                  <span class="badge bg-info">Importado</span>
+                {% endif %}
+              </div>
+            </div>
+          </td>
+
+          <td>{{ c.cnpj or '-' }}</td>
+
+          <td>
+            {% if c.telefone %}
+              <a href="tel:{{ c.telefone }}">{{ c.telefone }}</a>
+            {% else %}-{% endif %}
+          </td>
+
+          <td>{{ c.representante_nome or '-' }}</td>
+
+          {% if aba != 'pendentes' %}
+          <td>
+            {% if c.ultima_ligacao %}
+              {{ c.ultima_ligacao.strftime('%d/%m/%Y %H:%M') }}
+            {% else %}-{% endif %}
+          </td>
+          {% endif %}
+
+          {% if aba == 'retornar' %}
+          <td>
+            {% if c.proxima_ligacao %}
+              {{ c.proxima_ligacao.strftime('%d/%m/%Y %H:%M') }}
+            {% else %}-{% endif %}
+          </td>
+          {% endif %}
+
+          <td><span class="badge bg-info">{{ c.total_ligacoes }}</span></td>
+
+          <td>
+            <button class="btn btn-sm btn-primary"
+                    onclick="abrirForm({{ c.id }}, '{{ c.nome|e }}', '{{ c.telefone|e }}')">
+              <i class="bi bi-telephone-plus"></i>
+            </button>
+
+            {% if aba != 'pendentes' %}
+            <button class="btn btn-sm btn-outline-secondary"
+                    onclick="historico({{ c.id }})">
+              <i class="bi bi-clock-history"></i>
+            </button>
+            {% endif %}
+
+            <button class="btn btn-sm btn-outline-danger"
+                    onclick="removerCliente({{ c.id }}, '{{ c.nome|e }}')">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr>
+          <td colspan="8" class="text-center text-muted py-4">Nenhum cliente encontrado.</td>
+        </tr>
+        {% endif %}
+
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- MODAL: REGISTRAR LIGAÇÃO -->
+<!-- ====================================================== -->
+<div class="modal fade" id="modalLigacao" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form onsubmit="salvarLigacao(event)">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-telephone-plus"></i> Registrar Ligação</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body">
+          <input type="hidden" id="cliId">
+
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Cliente</label>
+              <input type="text" class="form-control" id="cliNome" disabled>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Nome de quem atendeu *</label>
+              <input type="text" class="form-control" id="contato_nome" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Telefone</label>
+              <input type="text" class="form-control" id="cliTelefone" disabled>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Resultado *</label>
+              <select class="form-select" id="resultado" onchange="toggleCamposResultado()">
+                <option value="nao_comprou">Não comprou</option>
+                <option value="comprou">Comprou</option>
+                <option value="retornar">Retornar depois</option>
+                <option value="sem_interesse">Sem interesse</option>
+                <option value="relacionamento">Relacionamento (pós-venda)</option>
+                <option value="cliente_inativo">Cliente Inativo</option>
+              </select>
+            </div>
+
+            <div class="col-md-6" id="valorContainer" style="display:none;">
+              <label class="form-label">Valor da venda (R$)</label>
+              <input type="number" step="0.01" class="form-control" id="valor_venda">
+            </div>
+
+            <!-- Campos para retorno -->
+            <div class="col-12" id="retornoContainer" style="display:none;">
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label">Retornar em (dias)</label>
+                  <input type="number" class="form-control" id="dias_retorno" min="1" value="30">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Ou em (data)</label>
+                  <input type="date" class="form-control" id="data_retorno">
+                </div>
+              </div>
+              <small class="text-muted">Se selecionar data, os dias são ignorados.</small>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Observações</label>
+              <textarea class="form-control" id="observacao" rows="3"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save"></i> Salvar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- 🆕 MODAL: HISTÓRICO COM EDIÇÃO -->
+<!-- ====================================================== -->
+<div class="modal fade" id="modalHistorico" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-clock-history"></i> Histórico</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="historicoContent">
+        <p class="text-muted">Carregando...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 🆕 MODAL: EDITAR OBSERVAÇÃO -->
+<div class="modal fade" id="modalEditarObs" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Editar Observação</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ligacaoIdEdit">
+        <label class="form-label">Observação</label>
+        <textarea class="form-control" id="observacaoEdit" rows="4"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="salvarEdicaoObs()">
+          <i class="bi bi-save"></i> Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- MODAL: LIMPAR CLIENTES -->
+<!-- ====================================================== -->
+<div class="modal fade" id="modalLimpar" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirmar limpeza</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Isso irá inativar todos os clientes do consultor selecionado. Deseja continuar?</p>
+        <select class="form-select" id="consultorLimpar">
+          {% for u in consultores or [] %}
+          <option value="{{ u.id }}">{{ u.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-warning" onclick="confirmarLimpeza()">Limpar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<!-- NOVO: MODAL ADICIONAR CLIENTE -->
+<!-- ====================================================== -->
+<div class="modal fade" id="modalAdicionar" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form onsubmit="salvarCliente(event)">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-person-plus"></i> Adicionar Cliente</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body">
+
+          <div class="mb-3">
+            <label class="form-label">Nome *</label>
+            <input type="text" class="form-control text-uppercase" id="novo_nome" required 
+                   style="text-transform: uppercase;">
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">CNPJ</label>
+              <input type="text" class="form-control" id="novo_cnpj" placeholder="00.000.000/0000-00">
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Telefone</label>
+              <input type="text" class="form-control" id="novo_telefone" placeholder="(00) 00000-0000">
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label">Representante</label>
+            <input type="text" class="form-control text-uppercase" id="novo_representante" 
+                   style="text-transform: uppercase;">
+          </div>
+
+          {% if is_supervisor %}
+          <div class="mt-3">
+            <label class="form-label">Consultor</label>
+            <select class="form-select" id="novo_consultor">
+              <option value="">Selecione...</option>
+              {% for u in consultores or [] %}
+              <option value="{{ u.id }}">{{ u.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <small class="text-muted mt-2 d-block">
+            Origem será marcada como <strong>manual</strong>.
+          </small>
+
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Salvar</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+
+<script>
+
+let modalLigacao = new bootstrap.Modal(document.getElementById('modalLigacao'));
+let modalHistorico = new bootstrap.Modal(document.getElementById('modalHistorico'));
+let modalLimpar = new bootstrap.Modal(document.getElementById('modalLimpar'));
+let modalAdicionar = new bootstrap.Modal(document.getElementById('modalAdicionar'));
+let modalEditarObs = new bootstrap.Modal(document.getElementById('modalEditarObs')); // 🆕 NOVO
+
+// 🆕 FECHAR POP-UP DE NOVIDADES
+async function fecharNovidades() {
+  await fetch('/marcar-novidades-vistas', { method: 'POST' });
+  document.getElementById('modalNovidades').style.display = 'none';
+}
+
+function abrirForm(id, nome, telefone) {
+  document.getElementById('cliId').value = id;
+  document.getElementById('cliNome').value = nome;
+  document.getElementById('cliTelefone').value = telefone || '';
+  document.getElementById('contato_nome').value = '';
+  document.getElementById('resultado').value = 'nao_comprou';
+  document.getElementById('valor_venda').value = '';
+  document.getElementById('observacao').value = '';
+  document.getElementById('dias_retorno').value = 30;
+  document.getElementById('data_retorno').value = '';
+  toggleCamposResultado();
+  modalLigacao.show();
+}
+
+function toggleCamposResultado() {
+  const r = document.getElementById('resultado').value;
+  const boxValor = document.getElementById('valorContainer');
+  const boxRetorno = document.getElementById('retornoContainer');
+
+  if (r === 'comprou') {
+    boxValor.style.display = 'block';
+    document.getElementById('valor_venda').required = true;
+  } else {
+    boxValor.style.display = 'none';
+    document.getElementById('valor_venda').required = false;
+    document.getElementById('valor_venda').value = '';
+  }
+
+  if (r === 'retornar') {
+    boxRetorno.style.display = 'block';
+  } else {
+    boxRetorno.style.display = 'none';
+    document.getElementById('dias_retorno').value = 30;
+    document.getElementById('data_retorno').value = '';
+  }
+}
+
+// 🆕 HISTÓRICO COM BOTÃO DE EDITAR
+function historico(id) {
+  modalHistorico.show();
+  fetch(`/historico-ligacoes/${id}`)
+    .then(r => r.json())
+    .then(hist => {
+      const div = document.getElementById('historicoContent');
+      if (!hist || hist.length === 0) {
+        div.innerHTML = '<p class="text-muted text-center">Nenhum registro de ligação.</p>';
+      } else {
+        let html = '<ul class="list-group">';
+        hist.forEach(item => {
+          html += `
+            <li class="list-group-item">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                  <strong>${item.data_hora}</strong> – ${item.consultor}<br>
+                  <span class="badge bg-light text-dark me-1">${item.resultado}</span>
+                  ${item.contato_nome ? 'Contato: '+item.contato_nome+'<br>' : ''}
+                  ${item.valor_venda !== '0,00' ? 'Valor: R$ '+item.valor_venda+'<br>' : ''}
+                  ${item.observacao ? '<div class="mt-2 p-2 bg-light rounded"><em>'+item.observacao+'</em></div>' : ''}
+                </div>
+                ${item.pode_editar ? `
+                  <button class="btn btn-sm btn-outline-primary" onclick="editarObservacao(${item.id}, '${(item.observacao || '').replace(/'/g, "\\'")}')">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                ` : ''}
+              </div>
+            </li>
+          `;
+        });
+        html += '</ul>';
+        div.innerHTML = html;
+      }
+    })
+    .catch(() => {
+      document.getElementById('historicoContent').innerHTML =
+        '<p class="text-danger">Erro ao carregar histórico.</p>';
+    });
+}
+
+// 🆕 ABRIR MODAL DE EDIÇÃO
+function editarObservacao(ligacaoId, obsAtual) {
+  document.getElementById('ligacaoIdEdit').value = ligacaoId;
+  document.getElementById('observacaoEdit').value = obsAtual;
+  modalHistorico.hide();
+  modalEditarObs.show();
+}
+
+// 🆕 SALVAR EDIÇÃO DA OBSERVAÇÃO
+async function salvarEdicaoObs() {
+  const ligacaoId = document.getElementById('ligacaoIdEdit').value;
+  const novaObs = document.getElementById('observacaoEdit').value;
+  
+  try {
+    const r = await fetch(`/editar-observacao/${ligacaoId}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ observacao: novaObs })
+    });
+    
+    const j = await r.json();
+    
+    if (j.ok) {
+      modalEditarObs.hide();
+      alert(j.mensagem || 'Observação atualizada!');
+      location.reload();
+    } else {
+      alert(j.mensagem || 'Erro ao atualizar');
+    }
+  } catch (erro) {
+    console.error('Erro:', erro);
+    alert('Erro ao atualizar observação');
+  }
+}
+
+function abrirModalLimpar() {
+  modalLimpar.show();
+}
+
+async function confirmarLimpeza() {
+  const id = document.getElementById('consultorLimpar').value;
+  const r = await fetch('/limpar-clientes-consultor', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({consultor_id: id})
+  });
+  const j = await r.json();
+  if (j.ok) {
+    modalLimpar.hide();
+    alert(j.mensagem);
+    location.reload();
+  } else {
+    alert(j.mensagem || 'Erro ao limpar');
+  }
+}
+
+// Salvar ligação
+async function salvarLigacao(e) {
+  e.preventDefault();
+  const id = document.getElementById('cliId').value;
+
+  const payload = {
+    contato_nome: document.getElementById('contato_nome').value,
+    resultado: document.getElementById('resultado').value,
+    valor_venda: document.getElementById('valor_venda').value,
+    observacao: document.getElementById('observacao').value
+  };
+
+  if (payload.resultado === 'retornar') {
+    const dias = parseInt(document.getElementById('dias_retorno').value || '30', 10);
+    const data = document.getElementById('data_retorno').value;
+    if (data) {
+      payload.data_retorno = data;
+    } else if (!isNaN(dias) && dias > 0) {
+      payload.dias_retorno = dias;
+    }
+  }
+
+  const r = await fetch(`/registrar-ligacao/${id}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+
+  const j = await r.json();
+  if (j.ok) {
+    modalLigacao.hide();
+    alert(j.mensagem || 'Ligação registrada!');
+    location.reload();
+  } else {
+    alert(j.mensagem || 'Erro ao registrar ligação');
+  }
+}
+
+// Modal novo cliente
+function abrirModalAdicionar() {
+  document.getElementById('novo_nome').value = '';
+  document.getElementById('novo_cnpj').value = '';
+  document.getElementById('novo_telefone').value = '';
+  document.getElementById('novo_representante').value = '';
+  {% if is_supervisor %}
+  document.getElementById('novo_consultor').value = '';
+  {% endif %}
+  modalAdicionar.show();
+}
+
+function limpaDigitos(v) {
+  return (v || '').replace(/\D+/g, '');
+}
+
+async function salvarCliente(e) {
+  e.preventDefault();
+
+  const nome = document.getElementById('novo_nome').value.trim().toUpperCase();
+  if (!nome) return alert("Informe o nome");
+
+  const payload = {
+    nome,
+    cnpj: limpaDigitos(document.getElementById('novo_cnpj').value),
+    telefone: limpaDigitos(document.getElementById('novo_telefone').value),
+    representante_nome: document.getElementById('novo_representante').value.trim().toUpperCase()
+  };
+
+  {% if is_supervisor %}
+  const cons = document.getElementById('novo_consultor').value;
+  if (!cons) return alert("Selecione o consultor");
+  payload.consultor_id = parseInt(cons);
+  {% endif %}
+
+  const r = await fetch('/clientes/criar', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+
+  const j = await r.json();
+  if (j.ok) {
+    modalAdicionar.hide();
+    alert(j.mensagem || "Cliente criado!");
+    location.reload();
+  } else {
+    alert(j.mensagem || "Erro ao criar");
+  }
+}
+
+function filtrarPorOrigem() {
+  const v = document.getElementById('filtroOrigem').value;
+  const rows = document.querySelectorAll('#tbodyClientes tr');
+
+  rows.forEach(tr => {
+    const o = tr.getAttribute('data-origem') || '';
+    tr.style.display = (!v || v === o) ? '' : 'none';
+  });
+}
+
+// Remover cliente (inativar)
+async function removerCliente(id, nome) {
+  const motivo = prompt(`Deseja realmente remover "${nome}"?\n\nMotivo (opcional):`);
+  
+  // Se cancelar, não faz nada
+  if (motivo === null) return;
+
+  try {
+    const r = await fetch(`/remover-cliente/${id}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ motivo: motivo || '' })
+    });
+
+    const j = await r.json();
+    
+    if (j.ok) {
+      alert(j.mensagem || 'Cliente removido com sucesso!');
+      location.reload();
+    } else {
+      alert(j.mensagem || 'Erro ao remover cliente');
+    }
+  } catch (erro) {
+    console.error('Erro:', erro);
+    alert('Erro ao remover cliente. Tente novamente.');
+  }
+}
+
+// 🆕 FUNÇÕES DO FILTRO MENSAL PARA CONSULTORES
+async function aplicarFiltroMesConsultor() {
+  const select = document.getElementById('filtroMesConsultor');
+  const valor = select.value; // formato: "mes-ano"
+  
+  if (!valor) {
+    // Se não selecionou nada, limpa o filtro
+    limparFiltroMesConsultor();
+    return;
+  }
+  
+  const [mes, ano] = valor.split('-');
+  const url = new URL(window.location);
+  
+  if (mes && ano) {
+    url.searchParams.set('mes', mes);
+    url.searchParams.set('ano', ano);
+  }
+  
+  window.location.href = url.toString();
+}
+
+function limparFiltroMesConsultor() {
+  const url = new URL(window.location);
+  url.searchParams.delete('mes');
+  url.searchParams.delete('ano');
+  window.location.href = url.toString();
+}
+
+// 🆕 CARREGAR DADOS DO MÊS SELECIONADO (se houver)
+document.addEventListener('DOMContentLoaded', async function() {
+  const mesFiltro = '{{ mes_filtro }}';
+  const anoFiltro = '{{ ano_filtro }}';
+  
+  if (mesFiltro && anoFiltro && mesFiltro !== 'None' && anoFiltro !== 'None') {
+    const resultadosDiv = document.getElementById('resultadosMesSelecionado');
+    if (resultadosDiv) {
+      resultadosDiv.style.display = 'block';
+      
+      try {
+        const response = await fetch(`/api/minhas-ligacoes-por-mes?mes=${mesFiltro}&ano=${anoFiltro}`);
+        const data = await response.json();
+        
+        if (data.ok) {
+          const stats = data.estatisticas;
+          resultadosDiv.innerHTML = `
+            <div class="row g-3">
+              <div class="col-md-3">
+                <div class="card border-primary">
+                  <div class="card-body text-center">
+                    <h5 class="text-primary">${stats.total_ligacoes}</h5>
+                    <small class="text-muted">Total de Ligações</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card border-success">
+                  <div class="card-body text-center">
+                    <h5 class="text-success">${stats.vendas}</h5>
+                    <small class="text-muted">Vendas</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card border-info">
+                  <div class="card-body text-center">
+                    <h5 class="text-info">${stats.taxa_conversao}%</h5>
+                    <small class="text-muted">Taxa de Conversão</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card border-warning">
+                  <div class="card-body text-center">
+                    <h5 class="text-warning">${stats.receita_fmt}</h5>
+                    <small class="text-muted">Receita Total</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            ${data.ligacoes.length > 0 ? `
+              <div class="mt-3">
+                <h6><i class="bi bi-telephone"></i> Ligações do Período</h6>
+                <div class="table-responsive">
+                  <table class="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Data</th>
+                        <th>Cliente</th>
+                        <th>Resultado</th>
+                        <th>Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${data.ligacoes.map(lig => `
+                        <tr>
+                          <td>${lig.data_hora}</td>
+                          <td>${lig.cliente_nome}</td>
+                          <td><span class="badge bg-${lig.resultado === 'comprou' ? 'success' : 'secondary'}">${lig.resultado}</span></td>
+                          <td>${lig.valor_venda_fmt}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ` : '<div class="alert alert-warning mt-3"><i class="bi bi-exclamation-triangle"></i> Nenhuma ligação encontrada no período selecionado.</div>'}
+          `;
+        } else {
+          resultadosDiv.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> Erro: ${data.erro}</div>`;
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados do mês:', error);
+        resultadosDiv.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> Erro ao carregar dados do mês selecionado.</div>`;
+      }
+    }
+  }
+});
+
+</script>
+
+{% endblock %}
