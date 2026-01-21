@@ -178,7 +178,9 @@
       <span class="input-group-text"><i class="bi bi-search"></i></span>
       <input type="text" class="form-control" name="q"
              placeholder="Buscar por nome, CNPJ, telefone ou representante..."
-             value="{{ request.args.get('q','') }}">
+             value="{{ request.args.get('q','') }}"
+             id="buscaRapida"
+             autocomplete="off">
     </div>
   </div>
 
@@ -925,6 +927,99 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
   }
 });
+
+// 🆕 BUSCA EM TEMPO REAL SEM ENTER
+let buscaTimeout;
+const buscaInput = document.getElementById('buscaRapida');
+if (buscaInput) {
+  buscaInput.addEventListener('input', function() {
+    clearTimeout(buscaTimeout);
+    const termo = this.value.trim();
+    
+    // Pequeno delay para não fazer muitas requisições
+    buscaTimeout = setTimeout(() => {
+      if (termo.length >= 2 || termo.length === 0) {
+        buscarClientesTempoReal(termo);
+      }
+    }, 300);
+  });
+}
+
+async function buscarClientesTempoReal(termo) {
+  try {
+    const aba = '{{ aba }}';
+    const apenas_meus = {{ 'true' if current_user.tipo == 'consultor' else 'false' }};
+    
+    const params = new URLSearchParams({
+      q: termo,
+      aba: aba,
+      meus: apenas_meus ? '1' : '0'
+    });
+    
+    const response = await fetch(`/api/busca-clientes?${params}`);
+    const data = await response.json();
+    
+    if (data.ok) {
+      atualizarTabelaClientes(data.clientes);
+    } else {
+      console.error('Erro na busca:', data.erro);
+    }
+  } catch (error) {
+    console.error('Erro ao buscar clientes:', error);
+  }
+}
+
+function atualizarTabelaClientes(clientes) {
+  const tbody = document.getElementById('tbodyClientes');
+  
+  if (!clientes || clientes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Nenhum cliente encontrado.</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = clientes.map(c => `
+    <tr data-origem="${c.origem || ''}">
+      <td>
+        <div class="d-flex flex-column">
+          <strong>${c.nome}</strong>
+          <div class="mt-1">
+            ${c.origem === 'manual' ? '<span class="badge bg-secondary">Manual</span>' : ''}
+            ${c.origem === 'importado_csv' ? '<span class="badge bg-info">Importado</span>' : ''}
+          </div>
+        </div>
+      </td>
+      <td>${c.cnpj || '-'}</td>
+      <td>${c.telefone ? `<a href="tel:${c.telefone}">${c.telefone}</a>` : '-'}</td>
+      <td>${c.representante_nome || '-'}</td>
+      {% if aba != 'pendentes' %}
+      <td>${c.ultima_ligacao || '-'}</td>
+      {% endif %}
+      {% if aba == 'retornar' %}
+      <td class="${c.retorno_atrasado ? 'text-danger fw-bold' : ''}">
+        ${c.proxima_ligacao || '-'}
+        ${c.retorno_atrasado ? '<i class="bi bi-exclamation-triangle"></i>' : ''}
+      </td>
+      {% endif %}
+      <td><span class="badge bg-info">${c.total_ligacoes}</span></td>
+      <td>
+        <button class="btn btn-sm btn-primary"
+                onclick="abrirForm(${c.id}, '${c.nome.replace(/'/g, "\\'")}', '${c.telefone || ''}')">
+          <i class="bi bi-telephone-plus"></i>
+        </button>
+        {% if aba != 'pendentes' %}
+        <button class="btn btn-sm btn-outline-secondary"
+                onclick="historico(${c.id})">
+          <i class="bi bi-clock-history"></i>
+        </button>
+        {% endif %}
+        <button class="btn btn-sm btn-outline-danger"
+                onclick="removerCliente(${c.id}, '${c.nome.replace(/'/g, "\\'")}')">
+          <i class="bi bi-trash"></i>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
 
 </script>
 

@@ -1928,6 +1928,82 @@ def alterar_senha():
         return jsonify({"ok": False, "mensagem": f"Erro: {str(e)}"}), 500
 
 # =============================================================================
+# BUSCA EM TEMPO REAL SEM ENTER
+# =============================================================================
+@app.route('/api/busca-clientes')
+@login_required
+def api_busca_clientes():
+    if not current_user.is_authenticated:
+        return jsonify({"erro": "Não autenticado"}), 401
+    
+    try:
+        termo = s(request.args.get('q', ''))
+        aba = request.args.get('aba', 'pendentes')
+        apenas_meus = True if current_user.tipo == 'consultor' else (request.args.get('meus') == '1')
+        
+        # Query base
+        q = Cliente.query.options(joinedload(Cliente.ligacoes)).filter(Cliente.ativo == True)
+        if apenas_meus:
+            q = q.filter(Cliente.consultor_id == current_user.id)
+        
+        # Aplicar filtro de busca
+        if termo:
+            like = f"%{termo}%"
+            q = q.filter(or_(
+                Cliente.nome.like(like),
+                Cliente.cnpj.like(like),
+                Cliente.telefone.like(like),
+                Cliente.representante_nome.like(like)
+            ))
+        
+        clientes_todos = q.order_by(Cliente.nome.asc()).all()
+        
+        pendentes, contatados, precisa_retornar = [], [], []
+        agora = datetime.now()
+        
+        for c in clientes_todos:
+            ligs = sorted(c.ligacoes, key=lambda x: x.data_hora, reverse=True)
+            ultima = ligs[0] if ligs else None
+            total = len(ligs)
+            dados = {
+                "id": c.id,
+                "nome": c.nome,
+                "cnpj": c.cnpj,
+                "telefone": c.telefone,
+                "representante_nome": c.representante_nome,
+                "ultima_ligacao": ultima.data_hora.strftime("%d/%m/%Y %H:%M") if ultima else None,
+                "total_ligacoes": total,
+                "proxima_ligacao": c.proxima_ligacao.strftime("%d/%m/%Y %H:%M") if c.proxima_ligacao else None,
+                "origem": getattr(c, 'origem', None),
+            }
+            
+            if total == 0:
+                pendentes.append(dados)
+            else:
+                if c.proxima_ligacao:
+                    dados["retorno_atrasado"] = (agora >= c.proxima_ligacao)
+                    precisa_retornar.append(dados)
+                else:
+                    contatados.append(dados)
+        
+        # Retornar apenas a aba solicitada
+        if aba == 'pendentes':
+            clientes = pendentes
+        elif aba == 'retornar':
+            clientes = sorted(precisa_retornar, key=lambda x: (x['proxima_ligacao'] or datetime.max))
+        else:
+            clientes = contatados
+        
+        return jsonify({
+            "ok": True,
+            "clientes": clientes,
+            "total": len(clientes)
+        })
+        
+    except Exception as e:
+        return jsonify({"ok": False, "erro": str(e)}), 500
+
+# =============================================================================
 # REMOVER CLIENTE (inativar)
 # =============================================================================
 @app.route('/remover-cliente/<int:cliente_id>', methods=['POST'])
